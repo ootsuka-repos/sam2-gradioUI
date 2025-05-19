@@ -14,6 +14,7 @@ from typing import Optional
 import av
 from app_conf import FFMPEG_NUM_THREADS
 from dataclasses_json import dataclass_json
+from security import safe_command
 
 TRANSCODE_VERSION = 1
 
@@ -179,8 +180,7 @@ def normalize_video(
     if verbose:
         print(" ".join(cmd))
 
-    subprocess.call(
-        cmd,
+    safe_command.run(subprocess.call, cmd,
         stdout=None if verbose else subprocess.DEVNULL,
         stderr=None if verbose else subprocess.DEVNULL,
     )

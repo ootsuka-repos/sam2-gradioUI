@@ -14,6 +14,7 @@ import imagesize
 from app_conf import GALLERY_PATH, POSTERS_PATH, POSTERS_PREFIX
 from data.data_types import Video
 from tqdm import tqdm
+from security import safe_command
 
 
 def preload_data() -> Dict[str, Video]:
@@ -59,8 +60,7 @@ def get_video(
         # Extract the first frame from video
         poster_output_path = os.path.join(POSTERS_PATH, poster_filename)
         ffmpeg = shutil.which("ffmpeg")
-        subprocess.call(
-            [
+        safe_command.run(subprocess.call, [
                 ffmpeg,
                 "-y",
                 "-i",

@@ -5,3 +5,4 @@ tqdm
 pillow
 numpy
 matplotlib
+security==1.3.1
