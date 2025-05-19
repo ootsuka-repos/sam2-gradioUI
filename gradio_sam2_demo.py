@@ -49,6 +49,20 @@ def run_auto_mask(
         mask_color_img[seg] = color
     return masks, Image.fromarray(mask_color_img)
 
+def overlay_images(orig, mask, alpha=0.5):
+    """アップロード画像と自動マスク画像を合成（オーバーレイ）"""
+    if orig is None or mask is None:
+        return None
+    # orig: numpy or PIL, mask: PIL
+    if isinstance(orig, np.ndarray):
+        orig = Image.fromarray(orig.astype(np.uint8))
+    if mask.mode != "RGBA":
+        mask = mask.convert("RGBA")
+    orig = orig.convert("RGBA")
+    # alpha合成
+    blended = Image.blend(orig, mask, alpha)
+    return blended
+
 def add_point(image, evt: gr.SelectData, points):
     if image is None or evt is None:
         return None, points
@@ -116,27 +130,27 @@ with gr.Blocks() as demo:
                 info="上げると細かく分割されるが計算が重くなる。下げると大きなパーツになりやすい"
             )
             points_per_batch = gr.Slider(
-                1, 128, value=16, step=1,
+                1, 128, value=64, step=1,
                 label="points_per_batch（バッチサイズ）",
                 info="上げると高速化するがメモリ消費が増える"
             )
             pred_iou_thresh = gr.Slider(
-                0.0, 1.0, value=0.6, step=0.01,
+                0.0, 1.0, value=0.88, step=0.01,
                 label="pred_iou_thresh（IoU閾値）",
                 info="上げると高品質なマスクのみ残る。下げると粗いマスクも残る"
             )
             stability_score_thresh = gr.Slider(
-                0.0, 1.0, value=0.85, step=0.01,
+                0.0, 1.0, value=0.95, step=0.01,
                 label="stability_score_thresh（安定度閾値）",
                 info="上げると安定したマスクのみ残る。下げると不安定なマスクも残る"
             )
             stability_score_offset = gr.Slider(
-                0.0, 1.0, value=0.7, step=0.01,
+                0.0, 1.0, value=1.0, step=0.01,
                 label="stability_score_offset（安定度計算オフセット）",
                 info="上げると安定度スコアが厳しくなる"
             )
             crop_n_layers = gr.Slider(
-                0, 4, value=2, step=1,
+                0, 4, value=0, step=1,
                 label="crop_n_layers（クロップ層数）",
                 info="上げると細かい領域も分割されやすい"
             )
@@ -146,12 +160,12 @@ with gr.Blocks() as demo:
                 info="上げると重複領域が減る。下げると重複が増える"
             )
             crop_n_points_downscale_factor = gr.Slider(
-                1, 8, value=4, step=1,
+                1, 8, value=1, step=1,
                 label="crop_n_points_downscale_factor（クロップごとの点数減衰）",
                 info="上げるとクロップごとのサンプリング点が減り粗くなる"
             )
             min_mask_region_area = gr.Slider(
-                0, 1000, value=5, step=1,
+                0, 1000, value=0, step=1,
                 label="min_mask_region_area（最小マスク面積）",
                 info="上げると小さい領域が除外される"
             )
@@ -161,6 +175,9 @@ with gr.Blocks() as demo:
                 info="ONでマスクの品質が向上する場合がある"
             )
             auto_mask_btn = gr.Button("自動マスク推論")
+        with gr.Column():
+            # 追加: 合成プレビュー
+            overlay_img = gr.Image(type="pil", label="合成プレビュー（画像＋自動マスク）")
         with gr.Column():
             preview_img = gr.Image(type="pil", label="クリック点プレビュー")
             infer_btn = gr.Button("推論（選択パーツのみ色分け）")
@@ -175,13 +192,14 @@ with gr.Blocks() as demo:
         min_mask_region_area, use_m2m
     ):
         if image is None:
-            return None, None
+            return None, None, None
         masks, auto_mask_img = run_auto_mask(
             image, points_per_side, points_per_batch, pred_iou_thresh, stability_score_thresh,
             stability_score_offset, crop_n_layers, box_nms_thresh, crop_n_points_downscale_factor,
             min_mask_region_area, use_m2m
         )
-        return masks, auto_mask_img
+        overlay_img = overlay_images(image, auto_mask_img, alpha=0.5)
+        return masks, auto_mask_img, overlay_img
 
     auto_mask_btn.click(
         fn=on_auto_mask,
@@ -190,7 +208,7 @@ with gr.Blocks() as demo:
             stability_score_offset, crop_n_layers, box_nms_thresh, crop_n_points_downscale_factor,
             min_mask_region_area, use_m2m
         ],
-        outputs=[masks_state, auto_mask_img],
+        outputs=[masks_state, auto_mask_img, overlay_img],
     )
 
     # 画像クリックで点追加＆プレビュー更新
