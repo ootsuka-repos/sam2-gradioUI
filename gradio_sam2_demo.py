@@ -51,8 +51,8 @@ def run_auto_mask(
         mask_color_img[seg] = color
     return masks, Image.fromarray(mask_color_img)
 
-def overlay_images(orig, mask, alpha=0.5):
-    """アップロード画像と自動マスク画像を合成（オーバーレイ）"""
+def overlay_images(orig, mask, masks=None, alpha=0.5):
+    """アップロード画像と自動マスク画像を合成し、各マスクのID(area)を描画"""
     if orig is None or mask is None:
         return None
     # orig: numpy or PIL, mask: PIL
@@ -63,6 +63,28 @@ def overlay_images(orig, mask, alpha=0.5):
     orig = orig.convert("RGBA")
     # alpha合成
     blended = Image.blend(orig, mask, alpha)
+
+    # マスクID描画
+    if masks is not None:
+        draw = ImageDraw.Draw(blended)
+        for m in masks:
+            area = m.get("area")
+            # 代表点: point_coords[0]があればそこ、なければbbox中心
+            pt = None
+            if "point_coords" in m and m["point_coords"] and m["point_coords"][0]:
+                pt = m["point_coords"][0]
+            elif "bbox" in m and m["bbox"]:
+                x, y, w, h = m["bbox"]
+                pt = [x + w / 2, y + h / 2]
+            if pt:
+                # 白黒縁取りでarea値を描画
+                x, y = int(pt[0]), int(pt[1])
+                text = str(area)
+                # 縁取り
+                for dx in [-1, 0, 1]:
+                    for dy in [-1, 0, 1]:
+                        draw.text((x+dx, y+dy), text, fill="black")
+                draw.text((x, y), text, fill="yellow")
     return blended
 
 def add_point(image, evt: gr.SelectData, points):
@@ -214,7 +236,7 @@ with gr.Blocks() as demo:
             stability_score_offset, crop_n_layers, box_nms_thresh, crop_n_points_downscale_factor,
             min_mask_region_area, use_m2m
         )
-        overlay_img = overlay_images(image, auto_mask_img, alpha=0.5)
+        overlay_img = overlay_images(image, auto_mask_img, masks=masks, alpha=0.5)
         return masks, auto_mask_img, overlay_img
 
     auto_mask_btn.click(
