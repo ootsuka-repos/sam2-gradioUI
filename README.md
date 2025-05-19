@@ -1,3 +1,6 @@
+pytorch 2.6.0を使う。 
+gradio UIにしたもの。
+
 # SAM 2: Segment Anything in Images and Videos
 
 **[AI at Meta, FAIR](https://ai.meta.com/research/)**
