@@ -4,6 +4,8 @@ os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 import gradio as gr
 import numpy as np
 from PIL import Image, ImageDraw
+import tempfile
+import pprint
 from sam2.build_sam import build_sam2
 from sam2.automatic_mask_generator import SAM2AutomaticMaskGenerator
 
@@ -178,6 +180,8 @@ with gr.Blocks() as demo:
         with gr.Column():
             # 追加: 合成プレビュー
             overlay_img = gr.Image(type="pil", label="合成プレビュー（画像＋自動マスク）")
+            save_mask_btn = gr.Button("マスク保存")
+            mask_file = gr.File(label="マスクtxt")
         with gr.Column():
             preview_img = gr.Image(type="pil", label="クリック点プレビュー")
             infer_btn = gr.Button("推論（選択パーツのみ色分け）")
@@ -185,7 +189,19 @@ with gr.Blocks() as demo:
         with gr.Column():
             mask_img = gr.Image(type="pil", label="クリックマスクプレビュー")
 
-    # 自動マスク推論ボタンでマスク生成＋プレビュー
+    # 5列目: マスク保存ボタンとファイル出力
+    # （不要なので削除）
+    # masks_stateをテキスト（repr/pprint）で保存
+    def save_masks_txt(masks_state):
+        import tempfile
+        import pprint
+        if not masks_state:
+            return None
+        with tempfile.NamedTemporaryFile(delete=False, mode="w", suffix=".txt", encoding="utf-8") as f:
+            pprint.pprint(masks_state, stream=f, width=120, compact=False)
+            temp_path = f.name
+        return temp_path
+
     def on_auto_mask(
         image, points_per_side, points_per_batch, pred_iou_thresh, stability_score_thresh,
         stability_score_offset, crop_n_layers, box_nms_thresh, crop_n_points_downscale_factor,
@@ -230,6 +246,13 @@ with gr.Blocks() as demo:
         fn=reset_points,
         inputs=[],
         outputs=[points_state, preview_img, mask_img],
+    )
+
+    # マスク保存ボタンのイベント
+    save_mask_btn.click(
+        fn=save_masks_txt,
+        inputs=[masks_state],
+        outputs=mask_file,
     )
 
 if __name__ == "__main__":
