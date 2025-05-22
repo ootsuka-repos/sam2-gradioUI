@@ -224,7 +224,7 @@ with gr.Blocks() as demo:
             if "area" in m and "bbox" in m
         ]
         with tempfile.NamedTemporaryFile(delete=False, mode="w", suffix=".txt", encoding="utf-8") as f:
-            pprint.pprint(masks_simple, stream=f, width=120, compact=False)
+            pprint.pprint(masks_state, stream=f, width=120, compact=False)
             temp_path = f.name
         return temp_path
 
