@@ -200,8 +200,8 @@ with gr.Blocks() as demo:
         with gr.Column():
             # 追加: 合成プレビュー
             overlay_img = gr.Image(type="pil", label="合成プレビュー（画像＋自動マスク）")
-            save_mask_btn = gr.Button("マスク保存")
-            mask_file = gr.File(label="マスクtxt")
+            save_mask_btn = gr.Button("マスクJSON保存")
+            mask_file = gr.File(label="マスクjson")
         with gr.Column():
             preview_img = gr.Image(type="pil", label="クリック点プレビュー")
             infer_btn = gr.Button("推論（選択パーツのみ色分け）")
@@ -212,19 +212,34 @@ with gr.Blocks() as demo:
     # 5列目: マスク保存ボタンとファイル出力
     # （不要なので削除）
     # masks_stateをテキスト（repr/pprint）で保存
-    def save_masks_txt(masks_state):
+    def rle_encode(mask):
+        """
+        2値numpy配列をRLE（Run-Length Encoding）でエンコードしリストで返す
+        """
+        import numpy as np
+        pixels = mask.flatten(order='C')
+        pads = np.pad(pixels, (1, 1), mode='constant', constant_values=0)
+        changes = np.where(pads[1:] != pads[:-1])[0]
+        runs = (changes[1:] - changes[:-1]).tolist()
+        return runs
+
+    def save_masks_json(masks_state):
         import tempfile
-        import pprint
+        import json
+        import numpy as np
         if not masks_state:
             return None
-        # areaとbboxだけ抽出
-        masks_simple = [
-            {"area": m.get("area"), "bbox": m.get("bbox")}
-            for m in masks_state
-            if "area" in m and "bbox" in m
-        ]
-        with tempfile.NamedTemporaryFile(delete=False, mode="w", suffix=".txt", encoding="utf-8") as f:
-            pprint.pprint(masks_simple, stream=f, width=120, compact=False)
+        masks_simple = []
+        for m in masks_state:
+            seg = m.get("segmentation")
+            mask_dict = {
+                "area": m.get("area"),
+                "bbox": m.get("bbox"),
+                "segmentation": rle_encode(np.asarray(seg, dtype=np.uint8)) if seg is not None else None
+            }
+            masks_simple.append(mask_dict)
+        with tempfile.NamedTemporaryFile(delete=False, mode="w", suffix=".json", encoding="utf-8") as f:
+            json.dump(masks_simple, f, ensure_ascii=False, indent=2)
             temp_path = f.name
         return temp_path
 
@@ -276,7 +291,7 @@ with gr.Blocks() as demo:
 
     # マスク保存ボタンのイベント
     save_mask_btn.click(
-        fn=save_masks_txt,
+        fn=save_masks_json,
         inputs=[masks_state],
         outputs=mask_file,
     )
