@@ -4,8 +4,6 @@ os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 import gradio as gr
 import numpy as np
 from PIL import Image, ImageDraw
-import tempfile
-import pprint
 from sam2.build_sam import build_sam2
 from sam2.automatic_mask_generator import SAM2AutomaticMaskGenerator
 
@@ -149,7 +147,7 @@ with gr.Blocks() as demo:
         with gr.Column():
             auto_mask_img = gr.Image(type="pil", label="自動マスクプレビュー")
             points_per_side = gr.Slider(
-                8, 128, value=32, step=1,
+                8, 128, value=40, step=1,
                 label="points_per_side（サンプリング密度）",
                 info="上げると細かく分割されるが計算が重くなる。下げると大きなパーツになりやすい"
             )
@@ -159,12 +157,12 @@ with gr.Blocks() as demo:
                 info="上げると高速化するがメモリ消費が増える"
             )
             pred_iou_thresh = gr.Slider(
-                0.0, 1.0, value=0.88, step=0.01,
+                0.0, 1.0, value=0.75, step=0.01,
                 label="pred_iou_thresh（IoU閾値）",
                 info="上げると高品質なマスクのみ残る。下げると粗いマスクも残る"
             )
             stability_score_thresh = gr.Slider(
-                0.0, 1.0, value=0.95, step=0.01,
+                0.0, 1.0, value=0.8, step=0.01,
                 label="stability_score_thresh（安定度閾値）",
                 info="上げると安定したマスクのみ残る。下げると不安定なマスクも残る"
             )
@@ -179,9 +177,9 @@ with gr.Blocks() as demo:
                 info="上げると細かい領域も分割されやすい"
             )
             box_nms_thresh = gr.Slider(
-                0.0, 1.0, value=0.7, step=0.01,
+                0.0, 1.0, value=0.2, step=0.01,
                 label="box_nms_thresh（NMS IoUしきい値）",
-                info="上げると重複領域が減る。下げると重複が増える"
+                info="上げると重複が増える 下げると重複領域が減る"
             )
             crop_n_points_downscale_factor = gr.Slider(
                 1, 8, value=1, step=1,
@@ -219,8 +217,14 @@ with gr.Blocks() as demo:
         import pprint
         if not masks_state:
             return None
+        # areaとbboxだけ抽出
+        masks_simple = [
+            {"area": m.get("area"), "bbox": m.get("bbox")}
+            for m in masks_state
+            if "area" in m and "bbox" in m
+        ]
         with tempfile.NamedTemporaryFile(delete=False, mode="w", suffix=".txt", encoding="utf-8") as f:
-            pprint.pprint(masks_state, stream=f, width=120, compact=False)
+            pprint.pprint(masks_simple, stream=f, width=120, compact=False)
             temp_path = f.name
         return temp_path
 
